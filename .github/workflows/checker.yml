@@ -34,15 +34,15 @@ jobs:
 
       - name: 💾 Guardar cambios en el repositorio si hubo modificaciones
         run: |
-          # Activamos el modo verbose (xtrace) para que imprima cada comando y su error exacto
           set -x
-          
           git config --global user.name "Bot de Pelosi"
           git config --global user.email "bot@actions.com"
           
-          git status
-          git add last_portfolio.json
-          git diff --cached --quiet || git commit -m "Actualización automática: Nuevo movimiento de Pelosi"
-          
-          # Hacemos el push imprimiendo la salida detallada
-          git push origin HEAD:main || git push origin HEAD:master
+          # Solo agregamos y hacemos commit si el archivo realmente fue creado por el script
+          if [ -f "last_portfolio.json" ]; then
+            git add last_portfolio.json
+            git diff --cached --quiet || git commit -m "Actualización automática: Nuevo movimiento de Pelosi"
+            git push origin HEAD:main || git push origin HEAD:master
+          else
+            echo "El archivo last_portfolio.json no existe todavía, omitiendo commit."
+          fi
