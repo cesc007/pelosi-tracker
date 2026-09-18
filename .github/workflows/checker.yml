@@ -5,14 +5,18 @@ on:
     - cron: '0 8 * * *' # Se ejecuta todos los días a las 8:00 AM UTC
   workflow_dispatch: # Permite ejecutarlo manualmente cuando quieras
 
+# 1. PERMISOS NECESARIOS: Esto le da autoridad al bot para escribir en el repositorio
+permissions:
+  contents: write
+
 jobs:
   run-tracker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Necesario para guardar los cambios en el archivo json del repositorio
     steps:
-      - name: 📥 Clonar repositorio
+      - name: 📥 Clonar repositorio y apuntar a la rama principal
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🐍 Configurar Python
         uses: actions/setup-python@v5
@@ -35,5 +39,9 @@ jobs:
         run: |
           git config --global user.name "Bot de Pelosi"
           git config --global user.email "bot@actions.com"
+          
+          # Asegurar que estamos en la rama main/master
+          git checkout main || git checkout master
+          
           git add last_portfolio.json
           git diff --quiet && git diff --staged --quiet || (git commit -m "Actualización automática: Nuevo movimiento de Pelosi" && git push)
