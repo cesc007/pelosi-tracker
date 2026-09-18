@@ -6,9 +6,9 @@ import requests
 
 API_URL = "https://api.quiverquant.com/beta/historical/congresstrading/Nancy%20Pelosi-P000197"
 
-EMAIL_USER = os.environ.get("EMAIL_USER")       # Tu correo de Gmail
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD") # La contraseña de aplicación de 16 dígitos
-EMAIL_TO = os.environ.get("EMAIL_TO")           # A dónde quieres que llegue la alerta
+EMAIL_USER = os.environ.get("EMAIL_USER")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+EMAIL_TO = os.environ.get("EMAIL_TO")
 
 def send_email_alert(message_content):
     if not EMAIL_USER or not EMAIL_PASSWORD or not EMAIL_TO:
@@ -51,14 +51,22 @@ def main():
         return
 
     filename = "last_portfolio.json"
-    previous_data = []
-    if os.path.exists(filename):
-        with open(filename, "r", encoding="utf-8") as f:
-            try:
-                previous_data = json.load(f)
-            except json.JSONDecodeError:
-                previous_data = []
+    
+    # Si el archivo no existe (primera ejecución), lo creamos sin disparar alerta
+    if not os.path.exists(filename):
+        print("Archivo inicial no encontrado. Creando línea base...")
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(current_data, f, indent=4, ensure_ascii=False)
+        return
 
+    # Cargar el registro anterior
+    with open(filename, "r", encoding="utf-8") as f:
+        try:
+            previous_data = json.load(f)
+        except json.JSONDecodeError:
+            previous_data = []
+
+    # Comparar datos
     if current_data != previous_data:
         print("¡Cambio detectado en el portafolio!")
         
