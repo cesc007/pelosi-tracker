@@ -78,6 +78,21 @@ def get_filings(year):
     return filings, total
 
 
+def load_previous():
+    if not os.path.exists(FILENAME):
+        return None
+    with open(FILENAME, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return []
+
+
+def save(data):
+    with open(FILENAME, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+
 def main():
     print("Revisando reportes oficiales de Nancy Pelosi...")
     year = datetime.now().year
@@ -90,6 +105,7 @@ def main():
     current = []
     lecturas_ok = 0
     errores = []
+    total_indice = 0
 
     for y in years:
         try:
@@ -98,6 +114,7 @@ def main():
                 errores.append(f"El índice de {y} llegó vacío (0 registros).")
                 continue
             current += filings
+            total_indice += total
             lecturas_ok += 1
             print(f"{y}: {total} registros en el índice, {len(filings)} de Pelosi.")
         except Exception as e:
@@ -107,26 +124,40 @@ def main():
     if lecturas_ok == 0:
         alert_failure(" | ".join(errores))
 
+    previous = load_previous()
+
     # Primera ejecución: se crea la línea base sin avisar
-    if not os.path.exists(FILENAME):
+    if previous is None:
         print("Archivo inicial no encontrado. Creando línea base...")
-        with open(FILENAME, "w", encoding="utf-8") as f:
-            json.dump(current, f, indent=4, ensure_ascii=False)
+        save(current)
         return
 
-    with open(FILENAME, "r", encoding="utf-8") as f:
-        try:
-            previous = json.load(f)
-        except json.JSONDecodeError:
-            previous = []
+    # Validación: si antes había reportes y ahora hay menos, el formato pudo cambiar
+    previous_same_years = [p for p in previous if p.get("year") in years]
+    if previous_same_years and len(current) < len(previous_same_years):
+        alert_failure(
+            f"Antes había {len(previous_same_years)} reportes de Pelosi y ahora solo "
+            f"{len(current)}. Es posible que el formato del archivo oficial haya cambiado."
+        )
+
+    # Aviso mensual de que el rastreador sigue vivo (día 1 de cada mes)
+    if datetime.now().day == 1:
+        send_email_alert(
+            "✅ El rastreador de Pelosi sigue funcionando",
+            "Lectura correcta del archivo oficial.\n"
+            f"Registros en el índice: {total_indice}.\n"
+            f"Reportes de Pelosi registrados: {len(current)}.\n"
+            "No es necesario hacer nada.",
+        )
 
     seen_ids = {p["doc_id"] for p in previous}
     nuevos = [c for c in current if c["doc_id"] not in seen_ids]
 
     if nuevos:
         print(f"¡{len(nuevos)} reporte(s) nuevo(s) detectado(s)!")
-        with open(FILENAME, "w", encoding="utf-8") as f:
-            json.dump(current, f, indent=4, ensure_ascii=False)
+        # Conservamos lo de años anteriores que no se leyó hoy
+        merged = [p for p in previous if p.get("year") not in years] + current
+        save(merged)
 
         lineas = [f"- Presentado el {n['fecha']}: {n['pdf']}" for n in nuevos]
         cuerpo = (
